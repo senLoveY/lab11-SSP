@@ -173,15 +173,16 @@ async function loadModels() {
   }
 }
 
-function addMessage(label, text) {
+function addMessage(label, text, format = "plain") {
   const message = document.createElement("article");
   message.className = "message";
   const title = document.createElement("h3");
+  title.className = "message-title";
   title.textContent = label;
-  const pre = document.createElement("pre");
-  const content = document.createTextNode(text);
-  pre.append(content);
-  message.append(title, pre);
+  const content = document.createElement("div");
+  content.className = format === "markdown" ? "message-markdown" : "message-plain";
+  content.textContent = text;
+  message.append(title, content);
   views[mode].messages.push(message);
   byId("empty-output").hidden = true;
   results.append(message);
@@ -285,7 +286,21 @@ form.addEventListener("submit", async event => {
   updateControls();
 
   const labels = { answer: "Ответ модели", draft: "Генерация", review: "Ревью" };
-  const chunks = new Map();
+  let activeOutput = null;
+  let renderFrame = 0;
+
+  function drawOutput(showCopy) {
+    cancelAnimationFrame(renderFrame);
+    renderFrame = 0;
+    if (!activeOutput)
+      return;
+
+    const atBottom = outputBody.scrollHeight - outputBody.scrollTop - outputBody.clientHeight < 28;
+    markdownOutput.render(activeOutput.element, activeOutput.source, showCopy);
+    if (atBottom)
+      outputBody.scrollTop = outputBody.scrollHeight;
+  }
+
   try {
     const response = await fetch("/lab/run", {
       method: "POST",
@@ -302,20 +317,20 @@ form.addEventListener("submit", async event => {
     await readEvents(response, message => {
       if (message.type !== "chunk")
         return;
-      if (!chunks.has(message.stage)) {
+      if (activeOutput?.stage !== message.stage) {
+        drawOutput(true);
         const label = mode === "review" ? "Ревью" : labels[message.stage];
-        chunks.set(message.stage, addMessage(label, ""));
+        activeOutput = { stage: message.stage, element: addMessage(label, "", "markdown"), source: "" };
         view.status = message.stage === "review" ? "Ревьюер проверяет код…" : "Модель отвечает…";
         showRunStatus();
       }
-      const atBottom = outputBody.scrollHeight - outputBody.scrollTop - outputBody.clientHeight < 28;
-      chunks.get(message.stage).appendData(message.text);
-      if (atBottom)
-        outputBody.scrollTop = outputBody.scrollHeight;
+      activeOutput.source += message.text;
+      if (message.text && renderFrame === 0)
+        renderFrame = requestAnimationFrame(() => drawOutput(false));
     });
 
     if (mode === "chat") {
-      chatHistory.push({ user: input, answer: chunks.get("answer").data });
+      chatHistory.push({ user: input, answer: activeOutput.source });
       if (chatHistory.length > 3)
         chatHistory.shift();
       prompt.value = "";
@@ -328,6 +343,7 @@ form.addEventListener("submit", async event => {
     if (!controller.signal.aborted)
       view.error = error.message;
   } finally {
+    drawOutput(true);
     currentRun = null;
     showRunStatus();
     updateControls();
