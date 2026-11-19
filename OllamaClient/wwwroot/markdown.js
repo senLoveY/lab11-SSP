@@ -83,7 +83,7 @@ const markdownOutput = (() => {
   function codeBlock(token, showCopy) {
     const block = element("div", "", "code-block");
     const toolbar = element("div", "", "code-toolbar");
-    const language = token.lang?.trim().split(/\s+/, 1)[0] || "";
+    const language = token.lang?.trim().split(/\s+/, 1)[0] || "csharp";
     const languageId = resolveLanguage(language);
     const languageLabel = languageId === "markup" && language ? language.toUpperCase()
       : Object.hasOwn(languageNames, languageId) ? languageNames[languageId] : language;
