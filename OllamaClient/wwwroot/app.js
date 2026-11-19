@@ -53,6 +53,9 @@ const form = byId("request");
 const prompt = byId("prompt");
 const model = byId("model");
 const reviewModel = byId("review-model");
+const picker = byId("model-picker");
+const modelQuery = byId("model-query");
+const modelOptions = byId("model-options");
 const run = byId("run");
 const stop = byId("stop");
 const refresh = byId("refresh");
@@ -75,20 +78,58 @@ let reviewer = "";
 let loadingModels = false;
 let currentRun = null;
 const chatHistory = [];
+let modelTarget = null;
 
-function fillOptions(select, saved, preferred) {
-  if (models.length === 0) {
-    select.replaceChildren(new Option(loadingModels ? "Загрузка моделей…" : "Модели недоступны", ""));
-    return;
-  }
-  select.replaceChildren(...models.map(name => new Option(name, name)));
-  select.value = [saved, preferred, developer, reviewer].find(name => models.includes(name)) ?? models[0];
+function showModel(button, saved, preferred) {
+  button.value = [saved, preferred, developer, reviewer].find(name => models.includes(name)) ?? models[0] ?? "";
+  button.firstElementChild.textContent = button.value || (loadingModels ? "Загрузка моделей…" : "Модели недоступны");
 }
 
 function showModels() {
   const view = views[mode];
-  fillOptions(model, view.model, mode === "review" ? reviewer : developer);
-  fillOptions(reviewModel, view.reviewModel, reviewer);
+  showModel(model, view.model, mode === "review" ? reviewer : developer);
+  showModel(reviewModel, view.reviewModel, reviewer);
+}
+
+function filterModels() {
+  const selected = modelTarget.value;
+  const query = modelQuery.value.trim().toLowerCase();
+  const matches = models.filter(name => name.toLowerCase().includes(query)).sort((a, b) => a.localeCompare(b));
+  const selectedIndex = matches.indexOf(selected);
+  if (selectedIndex > 0)
+    matches.unshift(...matches.splice(selectedIndex, 1));
+
+  modelOptions.replaceChildren(...matches.map(name => {
+    const item = document.createElement("li");
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "model-option";
+    const label = document.createElement("span");
+    label.textContent = name;
+    option.append(label);
+    if (name === selected) {
+      option.setAttribute("aria-current", "true");
+      const status = document.createElement("small");
+      status.textContent = "Выбрана";
+      option.append(status);
+    }
+    option.addEventListener("click", () => {
+      views[mode][modelTarget === model ? "model" : "reviewModel"] = name;
+      showModels();
+      picker.close();
+    });
+    item.append(option);
+    return item;
+  }));
+  byId("model-no-results").hidden = matches.length > 0;
+}
+
+function openModelPicker(button, labelId) {
+  modelTarget = button;
+  byId("picker-title").textContent = mode === "pipeline" ? byId(labelId).textContent : "Выбор модели";
+  modelQuery.value = "";
+  filterModels();
+  picker.showModal();
 }
 
 function updateControls() {
@@ -159,6 +200,7 @@ async function loadModels() {
   status.textContent = "Подключение к Ollama";
   connection.dataset.state = "pending";
   showNotice(notice, "");
+  showModels();
   updateControls();
 
   try {
@@ -280,8 +322,29 @@ modeButtons.forEach(button => button.addEventListener("click", () => {
   mode = button.dataset.mode;
   showMode();
 }));
-model.addEventListener("change", () => { views[mode].model = model.value; });
-reviewModel.addEventListener("change", () => { views[mode].reviewModel = reviewModel.value; });
+model.addEventListener("click", () => openModelPicker(model, "model-label"));
+reviewModel.addEventListener("click", () => openModelPicker(reviewModel, "review-model-label"));
+modelQuery.addEventListener("input", filterModels);
+picker.addEventListener("close", () => {
+  if (picker.open)
+    return;
+  modelTarget?.focus({ preventScroll: true });
+  modelTarget = null;
+});
+picker.addEventListener("keydown", event => {
+  const options = Array.from(modelOptions.querySelectorAll("button"));
+  if (event.target === modelQuery && event.key === "Enter" && !event.isComposing && options.length === 1) {
+    event.preventDefault();
+    options[0].click();
+  } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    const index = options.indexOf(event.target);
+    if (event.target !== modelQuery && index === -1)
+      return;
+    event.preventDefault();
+    const next = event.key === "ArrowDown" ? options[index + 1] || options[0] : options[index - 1] || options.at(-1);
+    next?.focus();
+  }
+});
 refresh.addEventListener("click", loadModels);
 function fillExample() {
   prompt.value = modes[mode].example;

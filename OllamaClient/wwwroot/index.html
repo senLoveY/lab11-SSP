@@ -41,14 +41,18 @@
           <p id="mode-description">Попроси модель написать метод или объяснить решение.</p>
         </div>
         <div class="model-fields">
-          <label class="field">
+          <div class="field">
             <span id="model-label">Модель</span>
-            <select id="model" disabled><option value="">Загрузка моделей…</option></select>
-          </label>
-          <label id="review-model-field" class="field" hidden>
-            <span>Модель для ревью</span>
-            <select id="review-model" disabled></select>
-          </label>
+            <button id="model" class="model-trigger" type="button" aria-haspopup="dialog" aria-labelledby="model-label model-value" disabled>
+              <span id="model-value">Загрузка моделей…</span>
+            </button>
+          </div>
+          <div id="review-model-field" class="field" hidden>
+            <span id="review-model-label">Модель для ревью</span>
+            <button id="review-model" class="model-trigger" type="button" aria-haspopup="dialog" aria-labelledby="review-model-label review-model-value" disabled>
+              <span id="review-model-value">Загрузка моделей…</span>
+            </button>
+          </div>
         </div>
         <p id="connection-error" class="notice" role="alert" hidden></p>
       </div>
@@ -92,5 +96,17 @@
       </form>
     </footer>
   </main>
+  <dialog id="model-picker" class="model-picker" aria-labelledby="picker-title">
+    <div class="picker-header">
+      <h2 id="picker-title">Выбор модели</h2>
+      <form method="dialog"><button class="button quiet" type="submit">Закрыть</button></form>
+    </div>
+    <label class="field picker-query">
+      <span>Поиск по названию</span>
+      <input id="model-query" type="search" placeholder="Например, qwen" autocomplete="off" autofocus>
+    </label>
+    <ul id="model-options" class="model-options" aria-label="Доступные модели"></ul>
+    <p id="model-no-results" class="model-no-results" role="status" hidden>Модели с таким названием не найдены.</p>
+  </dialog>
 </body>
 </html>
