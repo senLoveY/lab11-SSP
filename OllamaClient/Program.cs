@@ -1,13 +1,12 @@
 using System.Text;
 using System.Text.Json;
+using static OllamaClient.AgentPrompts;
 
 namespace OllamaClient;
 
 internal static class Program
 {
     private const string DefaultUrl = "http://127.0.0.1:11434";
-    private const string DeveloperModel = "codellama:7b";
-    private const string ReviewerModel = "deepseek-coder:6.7b";
     private const string ReviewExample = """
         public static int CalculateAverage(int[] numbers)
         {
@@ -26,10 +25,11 @@ internal static class Program
         if (args is ["--help"])
         {
             Console.WriteLine("Запустите без аргументов для открытия меню или с --models для списка моделей.");
+            Console.WriteLine("--web запускает интерфейс по адресу http://127.0.0.1:5080.");
             Console.WriteLine($"OLLAMA_BASE_URL задаёт адрес сервера. По умолчанию {DefaultUrl}.");
             return 0;
         }
-        if (args.Length > 0 && args is not ["--models"])
+        if (args.Length > 0 && args is not ["--models"] && args is not ["--web"])
         {
             Console.Error.WriteLine("Неизвестные аргументы. Используйте --help.");
             return 2;
@@ -53,6 +53,10 @@ internal static class Program
             BaseAddress = baseUrl,
             Timeout = TimeSpan.FromMinutes(5)
         };
+        var api = new OllamaApiClient(http);
+        if (args is ["--web"])
+            return await WebInterface.RunAsync(api, baseUrl);
+
         using var cancellation = new CancellationTokenSource();
         ConsoleCancelEventHandler cancel = (_, e) =>
         {
@@ -62,7 +66,6 @@ internal static class Program
         Console.CancelKeyPress += cancel;
         try
         {
-            var api = new OllamaApiClient(http);
             var models = await api.ListModelsAsync(cancellation.Token);
             Console.WriteLine($"Ollama · {baseUrl}");
             PrintModels(models);
@@ -184,9 +187,17 @@ internal static class Program
                 var assistant = new CodeAssistantAgent(api, developer);
                 var reviewAgent = new CodeReviewAgent(api, reviewer);
                 Console.WriteLine($"Шаг 1 · Генерация · {developer.Model}");
-                var draft = await PrintStreamAsync(assistant.ReplyAsync(task, cancellationToken));
-                Console.WriteLine($"\nШаг 2 · Ревью · {reviewer.Model}");
-                await PrintStreamAsync(reviewAgent.ReviewAsync(draft, cancellationToken));
+                var reviewStarted = false;
+                await foreach (var chunk in CodePipeline.RunAsync(assistant, reviewAgent, task, cancellationToken))
+                {
+                    if (chunk.IsReview && !reviewStarted)
+                    {
+                        Console.WriteLine($"\n\nШаг 2 · Ревью · {reviewer.Model}");
+                        reviewStarted = true;
+                    }
+                    Console.Write(chunk.Text);
+                }
+                Console.WriteLine();
                 break;
         }
     }
@@ -267,22 +278,17 @@ internal static class Program
         return null;
     }
 
-    private static async Task<string> PrintStreamAsync(IAsyncEnumerable<string> stream)
+    private static async Task PrintStreamAsync(IAsyncEnumerable<string> stream)
     {
-        var text = new StringBuilder();
         try
         {
             await foreach (var chunk in stream)
-            {
                 Console.Write(chunk);
-                text.Append(chunk);
-            }
         }
         finally
         {
             Console.WriteLine();
         }
-        return text.ToString();
     }
 
     private static void PrintModels(string[] models)
