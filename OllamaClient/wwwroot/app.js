@@ -252,7 +252,10 @@ function addMessage(label, text, format = "plain", modelName = "") {
   }
   const content = document.createElement("div");
   content.className = format === "markdown" ? "message-markdown" : "message-plain";
-  content.textContent = text;
+  if (format === "plain" && mode === "review")
+    markdownOutput.renderCode(content, text, "csharp");
+  else
+    content.textContent = text;
   message.append(header, content);
   views[mode].messages.push(message);
   byId("empty-output").hidden = true;

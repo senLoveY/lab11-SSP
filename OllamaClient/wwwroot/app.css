@@ -380,6 +380,13 @@ textarea.code { font: 14px/1.5 var(--mono); tab-size: 4; }
   font: 13px/1.6 var(--mono);
   border-radius: 0 0 9px 9px;
 }
+.code-token.comment, .code-token.prolog, .code-token.doctype { color: #4f6178; font-style: italic; }
+.code-token.keyword, .code-token.atrule, .code-token.important { color: #683295; }
+.code-token.string, .code-token.char, .code-token.attr-value, .code-token.regex { color: #146246; }
+.code-token.number, .code-token.boolean, .code-token.constant { color: #92390e; }
+.code-token.class-name, .code-token.builtin, .code-token.tag { color: #07528b; }
+.code-token.function, .code-token.property, .code-token.attr-name { color: #714616; }
+.code-token.operator, .code-token.punctuation { color: #4b5d75; }
 .markdown-table-scroll { max-width: 100%; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
 .markdown-table-scroll table { width: 100%; border-collapse: collapse; text-align: start; font-size: .92em; }
 .markdown-table-scroll th, .markdown-table-scroll td { padding: 7px 11px; text-align: start; vertical-align: top; }

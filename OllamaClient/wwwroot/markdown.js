@@ -2,7 +2,14 @@
 
 const markdownOutput = (() => {
   const inlineTags = { paragraph: "p", strong: "strong", em: "em", del: "del", blockquote: "blockquote" };
-  const languages = { csharp: "C#", cs: "C#", js: "JavaScript", ts: "TypeScript", json: "JSON", sql: "SQL" };
+  const languageNames = {
+    csharp: "C#", javascript: "JavaScript", typescript: "TypeScript", json: "JSON",
+    sql: "SQL", python: "Python", bash: "Bash", markup: "HTML / XML", css: "CSS"
+  };
+  const languageAliases = {
+    "c#": "csharp", cs: "csharp", js: "javascript", ts: "typescript",
+    py: "python", sh: "bash", shell: "bash", html: "markup", xml: "markup"
+  };
   const entityDecoder = document.createElement("textarea");
 
   function decodeEntities(text) {
@@ -39,16 +46,53 @@ const markdownOutput = (() => {
     return content;
   }
 
+  function resolveLanguage(language) {
+    const name = language.toLowerCase();
+    return Object.hasOwn(languageAliases, name) ? languageAliases[name] : name;
+  }
+
+  function appendCodeTokens(parent, tokens) {
+    for (const token of tokens) {
+      if (typeof token === "string") {
+        parent.append(token);
+      } else {
+        const span = element("span", "", "code-token " + token.type);
+        appendCodeTokens(span, Array.isArray(token.content) ? token.content : [token.content]);
+        parent.append(span);
+      }
+    }
+  }
+
+  function renderCode(target, source, language) {
+    const id = resolveLanguage(language);
+    const prism = window.Prism;
+    if (prism && Object.hasOwn(languageNames, id) && prism.languages[id]) {
+      try {
+        const tokens = prism.tokenize(source, prism.languages[id]);
+        const fragment = document.createDocumentFragment();
+        appendCodeTokens(fragment, tokens);
+        target.replaceChildren(fragment);
+        return;
+      } catch {
+        // Keep partial or unsupported code readable if tokenization fails.
+      }
+    }
+    target.textContent = source;
+  }
+
   function codeBlock(token, showCopy) {
     const block = element("div", "", "code-block");
     const toolbar = element("div", "", "code-toolbar");
     const language = token.lang?.trim().split(/\s+/, 1)[0] || "";
-    const languageLabel = Object.hasOwn(languages, language.toLowerCase()) ? languages[language.toLowerCase()] : language;
+    const languageId = resolveLanguage(language);
+    const languageLabel = languageId === "markup" && language ? language.toUpperCase()
+      : Object.hasOwn(languageNames, languageId) ? languageNames[languageId] : language;
     toolbar.append(element("span", languageLabel || "Код"));
 
     const pre = document.createElement("pre");
     pre.tabIndex = 0;
-    const code = element("code", token.text);
+    const code = element("code");
+    renderCode(code, token.text, language);
     pre.append(code);
 
     if (showCopy) {
@@ -172,6 +216,7 @@ const markdownOutput = (() => {
   }
 
   return {
+    renderCode,
     render(target, source, showCopy) {
       try {
         const tokens = window.marked.lexer(source, { gfm: true });
