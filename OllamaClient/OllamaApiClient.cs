@@ -7,6 +7,7 @@ namespace OllamaClient;
 
 internal sealed class OllamaApiClient(HttpClient http)
 {
+    private const string EmptyAnswer = "Ollama завершил генерацию без текста. Попробуйте уточнить запрос.";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<string[]> ListModelsAsync(CancellationToken cancellationToken)
@@ -37,7 +38,9 @@ internal sealed class OllamaApiClient(HttpClient http)
             throw new IOException("Ollama вернул пустой JSON-ответ.");
 
         CheckForError(result);
-        return result.Response ?? throw new IOException("В ответе Ollama отсутствует поле response.");
+        return string.IsNullOrWhiteSpace(result.Response)
+            ? throw new IOException(EmptyAnswer)
+            : result.Response;
     }
 
     public IAsyncEnumerable<string> GenerateStreamAsync(
@@ -76,6 +79,7 @@ internal sealed class OllamaApiClient(HttpClient http)
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
         await EnsureSuccessAsync(response, token);
         using var reader = new StreamReader(await response.Content.ReadAsStreamAsync(token));
+        var hasText = false;
 
         while (await reader.ReadLineAsync(token) is { } line)
         {
@@ -88,9 +92,16 @@ internal sealed class OllamaApiClient(HttpClient http)
 
             var text = chunk.Message?.Content ?? chunk.Response;
             if (!string.IsNullOrEmpty(text))
+            {
+                hasText |= !string.IsNullOrWhiteSpace(text);
                 yield return text;
+            }
             if (chunk.Done)
+            {
+                if (!hasText)
+                    throw new IOException(EmptyAnswer);
                 yield break;
+            }
         }
 
         throw new IOException("Поток Ollama оборвался до сообщения done.");
@@ -133,4 +144,5 @@ internal sealed record ChatMessage(string Role, string Content);
 
 internal sealed record GenerationOptions(
     double Temperature,
-    [property: JsonPropertyName("num_predict")] int MaxTokens);
+    [property: JsonPropertyName("num_predict")] int MaxTokens,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string[]? Stop);

@@ -5,7 +5,12 @@ namespace OllamaClient;
 
 internal sealed record AgentConfig(string Model, string SystemPrompt)
 {
-    public GenerationOptions Options { get; } = new(Temperature: 0.2, MaxTokens: 512);
+    public GenerationOptions Options { get; } = new(
+        Temperature: 0.2,
+        MaxTokens: 512,
+        Stop: Model.Equals("deepseek-coder:6.7b", StringComparison.OrdinalIgnoreCase)
+            ? ["<|EOT|>", "### Instruction:", "### Response:"]
+            : null);
 }
 
 internal static class AgentPrompts
