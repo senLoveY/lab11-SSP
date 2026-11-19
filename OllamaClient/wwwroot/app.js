@@ -59,7 +59,7 @@ const outputBody = byId("output-body");
 const modeButtons = [...document.querySelectorAll("[data-mode]")];
 
 const views = Object.fromEntries(Object.keys(modes).map(name => [name, {
-  draft: "", model: "", reviewModel: "", messages: [], status: "", error: ""
+  draft: "", model: "", reviewModel: "", messages: [], status: "", error: "", scrollTop: 0
 }]));
 
 let mode = "generate";
@@ -89,6 +89,7 @@ function updateControls() {
   const running = currentRun !== null;
   const modelUnavailable = loadingModels || models.length === 0;
   run.disabled = running || modelUnavailable;
+  run.hidden = running;
   model.disabled = running || modelUnavailable;
   reviewModel.disabled = running || modelUnavailable;
   refresh.disabled = running || loadingModels;
@@ -96,7 +97,7 @@ function updateControls() {
   stop.disabled = currentRun?.signal.aborted ?? false;
   prompt.readOnly = running;
   example.disabled = running;
-  clearChat.disabled = running || views.chat.messages.length === 0;
+  clearChat.disabled = running || views[mode].messages.length === 0;
   modeButtons.forEach(button => { button.disabled = running; });
 }
 
@@ -109,6 +110,7 @@ function showOutput() {
   const view = views[mode];
   results.replaceChildren(...view.messages);
   byId("empty-output").hidden = view.messages.length > 0;
+  outputBody.scrollTop = view.scrollTop;
   showRunStatus();
 }
 
@@ -126,7 +128,6 @@ function showMode() {
   byId("model-label").textContent = mode === "pipeline" ? "Модель для генерации" : "Модель";
   byId("review-model-field").hidden = mode !== "pipeline";
   byId("stream-field").hidden = mode !== "generate";
-  clearChat.hidden = mode !== "chat";
   prompt.value = views[mode].draft;
   prompt.placeholder = definition.placeholder;
   prompt.classList.toggle("code", mode === "review");
@@ -174,8 +175,14 @@ async function loadModels() {
 }
 
 function addMessage(label, text, format = "plain") {
+  const follow = format === "plain" || isNearBottom();
   const message = document.createElement("article");
   message.className = "message";
+  if (format === "plain") {
+    message.classList.add("message-user");
+    if (mode === "review")
+      message.classList.add("review-input");
+  }
   const title = document.createElement("h3");
   title.className = "message-title";
   title.textContent = label;
@@ -186,8 +193,13 @@ function addMessage(label, text, format = "plain") {
   views[mode].messages.push(message);
   byId("empty-output").hidden = true;
   results.append(message);
-  outputBody.scrollTop = outputBody.scrollHeight;
+  if (follow)
+    outputBody.scrollTop = outputBody.scrollHeight;
   return content;
+}
+
+function isNearBottom() {
+  return outputBody.scrollHeight - outputBody.scrollTop - outputBody.clientHeight < 28;
 }
 
 async function readEvents(response, onEvent) {
@@ -234,7 +246,10 @@ async function readEvents(response, onEvent) {
 }
 
 modeButtons.forEach(button => button.addEventListener("click", () => {
+  if (mode === button.dataset.mode)
+    return;
   views[mode].draft = prompt.value;
+  views[mode].scrollTop = outputBody.scrollTop;
   mode = button.dataset.mode;
   showMode();
 }));
@@ -246,10 +261,13 @@ example.addEventListener("click", () => {
   prompt.focus();
 });
 clearChat.addEventListener("click", () => {
-  chatHistory.length = 0;
-  views.chat.messages.length = 0;
-  views.chat.status = "История очищена.";
-  views.chat.error = "";
+  if (mode === "chat")
+    chatHistory.length = 0;
+  const view = views[mode];
+  view.messages.length = 0;
+  view.scrollTop = 0;
+  view.status = "История очищена.";
+  view.error = "";
   showOutput();
   updateControls();
   prompt.focus();
@@ -274,12 +292,9 @@ form.addEventListener("submit", async event => {
     return;
   }
 
-  if (mode !== "chat")
-    view.messages.length = 0;
   view.status = "Ожидаем ответ модели…";
-  showOutput();
-  if (mode === "chat")
-    addMessage("Ты", input);
+  showRunStatus();
+  addMessage(mode === "review" ? "Твой код" : "Ты", input);
 
   const controller = new AbortController();
   currentRun = controller;
@@ -295,7 +310,7 @@ form.addEventListener("submit", async event => {
     if (!activeOutput)
       return;
 
-    const atBottom = outputBody.scrollHeight - outputBody.scrollTop - outputBody.clientHeight < 28;
+    const atBottom = isNearBottom();
     markdownOutput.render(activeOutput.element, activeOutput.source, showCopy);
     if (atBottom)
       outputBody.scrollTop = outputBody.scrollHeight;
@@ -333,10 +348,8 @@ form.addEventListener("submit", async event => {
       chatHistory.push({ user: input, answer: activeOutput.source });
       if (chatHistory.length > 3)
         chatHistory.shift();
-      prompt.value = "";
-      prompt.readOnly = false;
-      prompt.focus();
     }
+    prompt.value = "";
     view.status = "Готово.";
   } catch (error) {
     view.status = controller.signal.aborted ? "Генерация остановлена." : "";
@@ -349,6 +362,8 @@ form.addEventListener("submit", async event => {
     updateControls();
     if (controller.signal.aborted)
       run.focus();
+    else if (document.activeElement === document.body)
+      prompt.focus();
   }
 });
 

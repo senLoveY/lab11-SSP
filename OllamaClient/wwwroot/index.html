@@ -33,21 +33,13 @@
     </div>
   </aside>
 
-  <main>
-    <header class="intro">
-      <h1 id="mode-title">Генерация кода</h1>
-      <p id="mode-description">Попроси модель написать метод или объяснить решение.</p>
-    </header>
-
-    <p id="connection-error" class="notice" role="alert" hidden></p>
-
-    <div class="workspace">
-      <form id="request" class="panel request" aria-label="Запрос к модели">
-        <div class="panel-head">
-          <h2>Запрос</h2>
-          <button id="example" class="button secondary" type="button">Вставить пример</button>
+  <main class="chat-shell">
+    <header class="chat-header">
+      <div class="chat-header-inner">
+        <div class="intro">
+          <h1 id="mode-title">Генерация кода</h1>
+          <p id="mode-description">Попроси модель написать метод или объяснить решение.</p>
         </div>
-
         <div class="model-fields">
           <label class="field">
             <span id="model-label">Модель</span>
@@ -58,40 +50,44 @@
             <select id="review-model" disabled></select>
           </label>
         </div>
+        <p id="connection-error" class="notice" role="alert" hidden></p>
+      </div>
+    </header>
 
-        <label class="field prompt-field">
-          <span id="prompt-label">Что нужно написать?</span>
-          <textarea id="prompt" rows="8" required placeholder="Например, напиши метод C# для поиска максимума."></textarea>
-        </label>
+    <section id="output-body" class="output-body" tabindex="0" aria-label="Переписка">
+      <div id="empty-output" class="empty">
+        <span class="empty-symbol" aria-hidden="true"><i></i><i></i><i></i></span>
+        <p>Отправь запрос или вставь готовый пример</p>
+      </div>
+      <div id="messages" class="messages"></div>
+    </section>
 
-        <div class="form-actions">
-          <label id="stream-field" class="stream">
-            <input id="stream" type="checkbox" checked>
-            <span>Потоковый вывод</span>
-          </label>
-          <button id="stop" class="button secondary" type="button" hidden>Остановить</button>
-          <button id="run" class="button primary" type="submit" disabled>Сгенерировать</button>
-        </div>
-      </form>
-
-      <section class="panel output" aria-labelledby="output-title">
-        <div class="panel-head">
-          <h2 id="output-title">Результат</h2>
-          <button id="clear-chat" class="button secondary" type="button" hidden>Очистить чат</button>
-        </div>
-        <div id="output-body" class="output-body" tabindex="0" aria-label="Ответ модели">
-          <div id="empty-output" class="empty">
-            <span class="empty-symbol" aria-hidden="true"><i></i><i></i><i></i></span>
-            <p>Здесь появится ответ модели</p>
-          </div>
-          <div id="messages" class="messages"></div>
-        </div>
-        <div class="result-footer">
+    <footer class="composer">
+      <form id="request" class="composer-inner" aria-label="Запрос к модели">
+        <div class="composer-status">
           <p id="run-status" role="status"></p>
           <p id="run-error" class="error" role="alert" hidden></p>
         </div>
-      </section>
-    </div>
+        <label class="field prompt-field">
+          <span id="prompt-label">Что нужно написать?</span>
+          <textarea id="prompt" rows="2" required placeholder="Например, напиши метод C# для поиска максимума."></textarea>
+        </label>
+        <div class="composer-actions">
+          <div class="composer-tools">
+            <button id="example" class="button secondary" type="button">Вставить пример</button>
+            <button id="clear-chat" class="button quiet" type="button">Очистить чат</button>
+          </div>
+          <div class="send-actions">
+            <label id="stream-field" class="stream">
+              <input id="stream" type="checkbox" checked>
+              <span>Потоковый вывод</span>
+            </label>
+            <button id="stop" class="button secondary" type="button" hidden>Остановить</button>
+            <button id="run" class="button primary" type="submit" disabled>Сгенерировать</button>
+          </div>
+        </div>
+      </form>
+    </footer>
   </main>
 </body>
 </html>
