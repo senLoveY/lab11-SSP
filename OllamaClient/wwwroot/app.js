@@ -4,6 +4,7 @@ const modes = {
   generate: {
     title: "Генерация кода",
     description: "Попроси модель написать метод или объяснить решение.",
+    emptyTitle: "Начни с задачи на C#",
     label: "Что нужно написать?",
     placeholder: "Например, напиши метод C# для поиска максимума.",
     example: "Напиши метод C# для поиска максимального элемента в массиве. Обработай пустой массив.",
@@ -11,7 +12,8 @@ const modes = {
   },
   chat: {
     title: "Чат с помощником C#",
-    description: "Модель получает три последних завершённых обмена сообщениями.",
+    description: "Помощник учитывает три последних обмена сообщениями.",
+    emptyTitle: "Задай вопрос о C#",
     label: "Сообщение",
     placeholder: "Задай вопрос о C# или уточни предыдущий ответ.",
     example: "Напиши на C# метод FindPeak для поиска максимума в массиве.",
@@ -19,7 +21,8 @@ const modes = {
   },
   review: {
     title: "Ревью кода",
-    description: "Вставь код C#, чтобы найти ошибки и получить вариант исправления.",
+    description: "Модель объяснит ошибки в коде и предложит исправления.",
+    emptyTitle: "Проверь метод или класс",
     label: "Код для проверки",
     placeholder: "Вставь сюда метод или класс C#.",
     example: `public static int FindMax(int[] numbers)
@@ -37,6 +40,7 @@ const modes = {
   pipeline: {
     title: "Конвейер агентов",
     description: "Помощник пишет код, затем ревьюер проверяет получившийся результат.",
+    emptyTitle: "Сгенерируй код и проверь его",
     label: "Задача для генерации",
     placeholder: "Опиши, какой код должен написать помощник.",
     example: "Напиши рекурсивный метод C# для вычисления n-го числа Фибоначчи.",
@@ -53,7 +57,9 @@ const run = byId("run");
 const stop = byId("stop");
 const refresh = byId("refresh");
 const example = byId("example");
+const emptyExample = byId("empty-example");
 const clearChat = byId("clear-chat");
+const jumpLatest = byId("jump-latest");
 const results = byId("messages");
 const outputBody = byId("output-body");
 const modeButtons = [...document.querySelectorAll("[data-mode]")];
@@ -97,7 +103,11 @@ function updateControls() {
   stop.disabled = currentRun?.signal.aborted ?? false;
   prompt.readOnly = running;
   example.disabled = running;
+  example.hidden = views[mode].messages.length === 0;
+  emptyExample.disabled = running;
+  byId("stream").disabled = running;
   clearChat.disabled = running || views[mode].messages.length === 0;
+  clearChat.hidden = views[mode].messages.length === 0;
   modeButtons.forEach(button => { button.disabled = running; });
 }
 
@@ -111,6 +121,7 @@ function showOutput() {
   results.replaceChildren(...view.messages);
   byId("empty-output").hidden = view.messages.length > 0;
   outputBody.scrollTop = view.scrollTop;
+  updateJump();
   showRunStatus();
 }
 
@@ -124,6 +135,7 @@ function showMode() {
   modeButtons.forEach(button => button.setAttribute("aria-pressed", String(button.dataset.mode === mode)));
   byId("mode-title").textContent = definition.title;
   byId("mode-description").textContent = definition.description;
+  byId("empty-title").textContent = definition.emptyTitle;
   byId("prompt-label").textContent = definition.label;
   byId("model-label").textContent = mode === "pipeline" ? "Модель для генерации" : "Модель";
   byId("review-model-field").hidden = mode !== "pipeline";
@@ -131,6 +143,7 @@ function showMode() {
   prompt.value = views[mode].draft;
   prompt.placeholder = definition.placeholder;
   prompt.classList.toggle("code", mode === "review");
+  sizePrompt();
   run.textContent = definition.action;
   showModels();
   showOutput();
@@ -174,7 +187,7 @@ async function loadModels() {
   }
 }
 
-function addMessage(label, text, format = "plain") {
+function addMessage(label, text, format = "plain", modelName = "") {
   const follow = format === "plain" || isNearBottom();
   const message = document.createElement("article");
   message.className = "message";
@@ -183,23 +196,37 @@ function addMessage(label, text, format = "plain") {
     if (mode === "review")
       message.classList.add("review-input");
   }
+  const header = document.createElement("header");
+  header.className = "message-header";
   const title = document.createElement("h3");
   title.className = "message-title";
   title.textContent = label;
+  header.append(title);
+  if (modelName) {
+    const modelTag = document.createElement("span");
+    modelTag.className = "message-model";
+    modelTag.textContent = modelName;
+    header.append(modelTag);
+  }
   const content = document.createElement("div");
   content.className = format === "markdown" ? "message-markdown" : "message-plain";
   content.textContent = text;
-  message.append(title, content);
+  message.append(header, content);
   views[mode].messages.push(message);
   byId("empty-output").hidden = true;
   results.append(message);
   if (follow)
     outputBody.scrollTop = outputBody.scrollHeight;
+  updateJump();
   return content;
 }
 
 function isNearBottom() {
   return outputBody.scrollHeight - outputBody.scrollTop - outputBody.clientHeight < 28;
+}
+
+function updateJump() {
+  jumpLatest.hidden = views[mode].messages.length === 0 || isNearBottom();
 }
 
 async function readEvents(response, onEvent) {
@@ -256,9 +283,35 @@ modeButtons.forEach(button => button.addEventListener("click", () => {
 model.addEventListener("change", () => { views[mode].model = model.value; });
 reviewModel.addEventListener("change", () => { views[mode].reviewModel = reviewModel.value; });
 refresh.addEventListener("click", loadModels);
-example.addEventListener("click", () => {
+function fillExample() {
   prompt.value = modes[mode].example;
+  sizePrompt();
   prompt.focus();
+}
+example.addEventListener("click", fillExample);
+emptyExample.addEventListener("click", fillExample);
+outputBody.addEventListener("scroll", updateJump, { passive: true });
+window.addEventListener("resize", updateJump);
+jumpLatest.addEventListener("click", () => {
+  outputBody.focus({ preventScroll: true });
+  outputBody.scrollTop = outputBody.scrollHeight;
+  updateJump();
+});
+function sizePrompt() {
+  const follow = isNearBottom();
+  prompt.style.height = "";
+  if (prompt.value)
+    prompt.style.height = (prompt.scrollHeight + prompt.offsetHeight - prompt.clientHeight) + "px";
+  if (follow)
+    outputBody.scrollTop = outputBody.scrollHeight;
+  updateJump();
+}
+prompt.addEventListener("input", sizePrompt);
+prompt.addEventListener("keydown", event => {
+  if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.isComposing && !run.disabled) {
+    event.preventDefault();
+    form.requestSubmit(run);
+  }
 });
 clearChat.addEventListener("click", () => {
   if (mode === "chat")
@@ -282,10 +335,10 @@ form.addEventListener("submit", async event => {
   if (currentRun || loadingModels || !model.value)
     return;
 
-  const input = prompt.value.trim();
+  const input = prompt.value;
   const view = views[mode];
   view.error = "";
-  if (!input) {
+  if (!input.trim()) {
     view.error = "Введи запрос или вставь пример.";
     showRunStatus();
     prompt.focus();
@@ -295,6 +348,8 @@ form.addEventListener("submit", async event => {
   view.status = "Ожидаем ответ модели…";
   showRunStatus();
   addMessage(mode === "review" ? "Твой код" : "Ты", input);
+  prompt.value = "";
+  sizePrompt();
 
   const controller = new AbortController();
   currentRun = controller;
@@ -314,6 +369,7 @@ form.addEventListener("submit", async event => {
     markdownOutput.render(activeOutput.element, activeOutput.source, showCopy);
     if (atBottom)
       outputBody.scrollTop = outputBody.scrollHeight;
+    updateJump();
   }
 
   try {
@@ -335,7 +391,8 @@ form.addEventListener("submit", async event => {
       if (activeOutput?.stage !== message.stage) {
         drawOutput(true);
         const label = mode === "review" ? "Ревью" : labels[message.stage];
-        activeOutput = { stage: message.stage, element: addMessage(label, "", "markdown"), source: "" };
+        const modelName = message.stage === "review" ? reviewModel.value : model.value;
+        activeOutput = { stage: message.stage, element: addMessage(label, "", "markdown", modelName), source: "" };
         view.status = message.stage === "review" ? "Ревьюер проверяет код…" : "Модель отвечает…";
         showRunStatus();
       }
@@ -349,9 +406,10 @@ form.addEventListener("submit", async event => {
       if (chatHistory.length > 3)
         chatHistory.shift();
     }
-    prompt.value = "";
     view.status = "Готово.";
   } catch (error) {
+    prompt.value = input;
+    sizePrompt();
     view.status = controller.signal.aborted ? "Генерация остановлена." : "";
     if (!controller.signal.aborted)
       view.error = error.message;

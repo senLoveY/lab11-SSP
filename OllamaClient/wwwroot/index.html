@@ -57,10 +57,12 @@
     <section id="output-body" class="output-body" tabindex="0" aria-label="Переписка">
       <div id="empty-output" class="empty">
         <span class="empty-symbol" aria-hidden="true"><i></i><i></i><i></i></span>
-        <p>Отправь запрос или вставь готовый пример</p>
+        <h2 id="empty-title">Начни с задачи на C#</h2>
+        <button id="empty-example" class="button secondary" type="button">Попробовать пример</button>
       </div>
       <div id="messages" class="messages"></div>
     </section>
+    <button id="jump-latest" class="button jump-latest" type="button" hidden>К последнему сообщению ↓</button>
 
     <footer class="composer">
       <form id="request" class="composer-inner" aria-label="Запрос к модели">
@@ -74,14 +76,15 @@
         </label>
         <div class="composer-actions">
           <div class="composer-tools">
-            <button id="example" class="button secondary" type="button">Вставить пример</button>
-            <button id="clear-chat" class="button quiet" type="button">Очистить чат</button>
+            <button id="example" class="button secondary" type="button" hidden>Вставить пример</button>
+            <button id="clear-chat" class="button quiet" type="button" hidden>Очистить чат</button>
           </div>
           <div class="send-actions">
             <label id="stream-field" class="stream">
               <input id="stream" type="checkbox" checked>
               <span>Потоковый вывод</span>
             </label>
+            <kbd class="send-shortcut" aria-hidden="true">Ctrl / ⌘ + Enter</kbd>
             <button id="stop" class="button secondary" type="button" hidden>Остановить</button>
             <button id="run" class="button primary" type="submit" disabled>Сгенерировать</button>
           </div>
