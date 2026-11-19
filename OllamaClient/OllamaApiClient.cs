@@ -26,7 +26,7 @@ internal sealed class OllamaApiClient(HttpClient http)
         {
             model = config.Model,
             prompt,
-            system = config.SystemPrompt,
+            system = config.Prompt.System,
             stream = false,
             options = config.Options
         };
@@ -49,7 +49,7 @@ internal sealed class OllamaApiClient(HttpClient http)
         {
             model = config.Model,
             prompt,
-            system = config.SystemPrompt,
+            system = config.Prompt.System,
             stream = true,
             options = config.Options
         }, cancellationToken);

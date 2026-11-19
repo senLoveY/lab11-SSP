@@ -95,8 +95,9 @@ internal static class WebInterface
                 await WriteAsync(new WebEvent("chunk", chunk, stage));
         }
 
-        var developer = new AgentConfig(input.Model, AgentPrompts.Developer);
-        var reviewer = new AgentConfig(input.ReviewModel ?? input.Model, AgentPrompts.Reviewer);
+        var developer = new AgentConfig(input.Model, AgentPrompts.Generation);
+        var reviewerModel = input.Mode == "pipeline" ? input.ReviewModel! : input.Model;
+        var reviewer = new AgentConfig(reviewerModel, AgentPrompts.Reviewer);
 
         try
         {
@@ -113,7 +114,7 @@ internal static class WebInterface
                     var history = input.History?.TakeLast(3)
                         .Where(turn => !string.IsNullOrWhiteSpace(turn?.User) && !string.IsNullOrWhiteSpace(turn?.Answer))
                         .SelectMany(turn => new[] { new ChatMessage("user", turn!.User), new ChatMessage("assistant", turn.Answer) });
-                    var chat = new CodeAssistantAgent(api, developer, history);
+                    var chat = new CodeAssistantAgent(api, new AgentConfig(input.Model, AgentPrompts.Conversation), history);
                     await WriteStreamAsync(chat.ReplyAsync(input.Prompt, token));
                     break;
                 case "review":

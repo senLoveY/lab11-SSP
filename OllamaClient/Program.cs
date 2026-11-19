@@ -145,7 +145,7 @@ internal static class Program
     private static async Task RunModeAsync(
         OllamaApiClient api, string[] models, string choice, CancellationToken cancellationToken)
     {
-        var developer = new AgentConfig(ChooseModel(models, DeveloperModel), AgentPrompts.Developer);
+        var developer = new AgentConfig(ChooseModel(models, DeveloperModel), AgentPrompts.Generation);
         var reviewer = new AgentConfig(ChooseModel(models, ReviewerModel), AgentPrompts.Reviewer);
 
         switch (choice)
@@ -165,7 +165,7 @@ internal static class Program
                 break;
 
             case "4":
-                await RunChatAsync(api, developer, cancellationToken);
+                await RunChatAsync(api, new AgentConfig(developer.Model, AgentPrompts.Conversation), cancellationToken);
                 break;
 
             case "5":
